@@ -1,5 +1,6 @@
 pub mod help;
 
+use std::io::{Stdout, Write};
 use termion::event::Key;
 use termion::{cursor, terminal_size};
 
@@ -20,14 +21,14 @@ impl CommandLine {
         }
     }
 
-    pub fn handle_key(&mut self, key: Key) -> bool {
+    pub fn handle_key(&mut self, key: Key, stdout: &mut Stdout) -> bool {
         if self.message_mode {
             self.message_mode = false;
             self.text.clear();
         }
 
         match key {
-            Key::Char('\n') => self.process_command(),
+            Key::Char('\n') => self.process_command(stdout),
             Key::Backspace => {
                 self.text.pop();
                 true
@@ -48,7 +49,7 @@ impl CommandLine {
     /// Process the command provided. Returns `true` if the program should
     /// continue running or `false` if the program should be exited as soon
     /// as possible.
-    fn process_command(&mut self) -> bool {
+    fn process_command(&mut self, stdout: &mut Stdout) -> bool {
         let command_words: Vec<String> = self
             .text
             .split_whitespace()
@@ -66,10 +67,10 @@ impl CommandLine {
             match command_words[0].to_lowercase().as_str() {
                 ":help" => help::show_help(),
                 ":redraw" => {
-                    console_clear();
+                    console_clear(stdout);
                     self.show_message("redrawing...");
-                    self.draw();
-                    console_show();
+                    self.draw(stdout);
+                    console_show(stdout);
                 }
                 ":exit" => return false,
                 _ => self.show_message("Unknown command. Type :help to get a list of commands")
@@ -80,7 +81,7 @@ impl CommandLine {
             // TODO
         }
 
-        self.draw();
+        self.draw(stdout);
         true
     }
 
@@ -91,10 +92,11 @@ impl CommandLine {
     }
 
     /// Draw the command line to the bottom of the screen
-    pub fn draw(&self) {
+    pub fn draw(&self, stdout: &mut Stdout) {
         let (_, height) = terminal_size().expect("Could not get terminal size.");
 
-        print!(
+        write!(
+            stdout,
             "{}{}{}",
             cursor::Goto(1, height - self.height()),
             self.text,
